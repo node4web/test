@@ -9,7 +9,8 @@
 
 </div>
 
-🏷️ Implements `node:test` as of Node.js v20.0.0
+👨‍🔬 Great for browser compat with existing `node:test` tests \
+🏷️ Implements `node:test` as of Node.js v20.0.0 (see below)
 
 ❓ You may be looking for [nodejs/node-core-test] instead. It's `node:test`
 extracted into an npm package, but coupled very closely to Node.js and intended
