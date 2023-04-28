@@ -1,2 +1,2 @@
-await Promise.resolve()
-process.exit()
+await Promise.resolve();
+process.exit();

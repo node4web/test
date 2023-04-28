@@ -1,3 +1,3 @@
-'use strict'
+"use strict";
 
-module.exports = console
+module.exports = console;

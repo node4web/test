@@ -1,1 +1,1 @@
-await new Promise(() => {})
+await new Promise(() => {});

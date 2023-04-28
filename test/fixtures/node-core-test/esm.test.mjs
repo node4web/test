@@ -1,3 +1,3 @@
-import test from '#node:test'
+import test from "#node:test";
 
-test('this should pass')
+test("this should pass");

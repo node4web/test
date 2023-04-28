@@ -1,3 +1,3 @@
-'use strict'
+"use strict";
 
-module.exports = require('assert')
+module.exports = require("assert");

@@ -1,57 +1,68 @@
 // https://github.com/nodejs/node/blob/f8ce9117b19702487eb600493d941f7876e00e01/test/parallel/test-runner-tap-checker.js
-'use strict'
+"use strict";
 // Flags: --expose-internals
 
-require('../common')
-const assert = require('assert')
+require("../common");
+const assert = require("assert");
 
-const { TapParser } = require('#internal/test_runner/tap_parser')
-const { TapChecker } = require('#internal/test_runner/tap_checker')
+const { TapParser } = require("#internal/test_runner/tap_parser");
+const { TapChecker } = require("#internal/test_runner/tap_checker");
 
-function TAPChecker (input) {
+function TAPChecker(input) {
   // parse
-  const parser = new TapParser({ specs: TapChecker.TAP14 })
-  parser.parseSync(input)
-  parser.check()
+  const parser = new TapParser({ specs: TapChecker.TAP14 });
+  parser.parseSync(input);
+  parser.check();
 }
 
 [
-  ['TAP version 14', 'missing TAP plan'],
-  [`
+  ["TAP version 14", "missing TAP plan"],
+  [
+    `
 TAP version 14
 1..1
-  `, 'missing Test Points'],
-  [`
+  `,
+    "missing Test Points",
+  ],
+  [
+    `
 TAP version 14
 1..1
 ok 2
-  `, 'test 2 is out of plan range 1..1'],
-  [`
+  `,
+    "test 2 is out of plan range 1..1",
+  ],
+  [
+    `
 TAP version 14
 3..1
 ok 2
-  `, 'plan start 3 is greater than plan end 1'],
-  [`
+  `,
+    "plan start 3 is greater than plan end 1",
+  ],
+  [
+    `
 TAP version 14
 2..3
 ok 1
 ok 2
 ok 3
-  `, 'test 1 is out of plan range 2..3']
-
+  `,
+    "test 1 is out of plan range 2..3",
+  ],
 ].forEach(([str, message]) => {
   assert.throws(() => TAPChecker(str), {
-    code: 'ERR_TAP_VALIDATION_ERROR',
-    message
-  })
-})
+    code: "ERR_TAP_VALIDATION_ERROR",
+    message,
+  });
+});
 
 // Valid TAP14 should not throw
 TAPChecker(`
 TAP version 14
 1..1
 ok
-`)
+`);
 
 // Valid comment line shout not throw.
 TAPChecker(`
@@ -63,13 +74,13 @@ ok 2 - # SKIP no /sys directory
 ok 3 - # SKIP no /sys directory
 ok 4 - # SKIP no /sys directory
 ok 5 - # SKIP no /sys directory
-`)
+`);
 
 // Valid empty test plan should not throw.
 TAPChecker(`
 TAP version 14
 1..0 # skip because English-to-French translator isn't installed
-`)
+`);
 
 // Valid test plan count should not throw.
 TAPChecker(`
@@ -79,7 +90,7 @@ ok 1 - Creating test program
 ok 2 - Test program runs, no error
 not ok 3 - infinite loop # TODO halting problem unsolved
 not ok 4 - infinite loop 2 # TODO halting problem unsolved
-`)
+`);
 
 // Valid YAML diagnostic should not throw.
 TAPChecker(`
@@ -109,7 +120,7 @@ ok
   ...
 ok - board has 7 tiles + starter tile
 1..9
-`)
+`);
 
 // Valid Bail out should not throw.
 TAPChecker(`
@@ -117,4 +128,4 @@ TAP version 14
 1..573
 not ok 1 - database handle
 Bail out! Couldn't connect to database.
-`)
+`);

@@ -1,72 +1,72 @@
 // https://github.com/nodejs/node/blob/f8ce9117b19702487eb600493d941f7876e00e01/lib/internal/test_runner/tap_checker.js
-'use strict'
+"use strict";
 
 const {
   ArrayPrototypeFilter,
   ArrayPrototypeFind,
-  NumberParseInt
-} = require('#internal/per_context/primordials')
+  NumberParseInt,
+} = require("#internal/per_context/primordials");
 const {
-  codes: { ERR_TAP_VALIDATION_ERROR }
-} = require('#internal/errors')
-const { TokenKind } = require('#internal/test_runner/tap_lexer')
+  codes: { ERR_TAP_VALIDATION_ERROR },
+} = require("#internal/errors");
+const { TokenKind } = require("#internal/test_runner/tap_lexer");
 
 // TODO(@manekinekko): add more validation rules based on the TAP14 spec.
 // See https://testanything.org/tap-version-14-specification.html
 class TAPValidationStrategy {
-  validate (ast) {
-    this.#validateVersion(ast)
-    this.#validatePlan(ast)
-    this.#validateTestPoints(ast)
+  validate(ast) {
+    this.#validateVersion(ast);
+    this.#validatePlan(ast);
+    this.#validateTestPoints(ast);
 
-    return true
+    return true;
   }
 
-  #validateVersion (ast) {
+  #validateVersion(ast) {
     const entry = ArrayPrototypeFind(
       ast,
       (node) => node.kind === TokenKind.TAP_VERSION
-    )
+    );
 
     if (!entry) {
-      throw new ERR_TAP_VALIDATION_ERROR('missing TAP version')
+      throw new ERR_TAP_VALIDATION_ERROR("missing TAP version");
     }
 
-    const { version } = entry.node
+    const { version } = entry.node;
 
     // TAP14 specification is compatible with observed behavior of existing TAP13 consumers and producers
-    if (version !== '14' && version !== '13') {
-      throw new ERR_TAP_VALIDATION_ERROR('TAP version should be 13 or 14')
+    if (version !== "14" && version !== "13") {
+      throw new ERR_TAP_VALIDATION_ERROR("TAP version should be 13 or 14");
     }
   }
 
-  #validatePlan (ast) {
+  #validatePlan(ast) {
     const entry = ArrayPrototypeFind(
       ast,
       (node) => node.kind === TokenKind.TAP_PLAN
-    )
+    );
 
     if (!entry) {
-      throw new ERR_TAP_VALIDATION_ERROR('missing TAP plan')
+      throw new ERR_TAP_VALIDATION_ERROR("missing TAP plan");
     }
 
-    const plan = entry.node
+    const plan = entry.node;
 
     if (!plan.start) {
-      throw new ERR_TAP_VALIDATION_ERROR('missing plan start')
+      throw new ERR_TAP_VALIDATION_ERROR("missing plan start");
     }
 
     if (!plan.end) {
-      throw new ERR_TAP_VALIDATION_ERROR('missing plan end')
+      throw new ERR_TAP_VALIDATION_ERROR("missing plan end");
     }
 
-    const planStart = NumberParseInt(plan.start, 10)
-    const planEnd = NumberParseInt(plan.end, 10)
+    const planStart = NumberParseInt(plan.start, 10);
+    const planEnd = NumberParseInt(plan.end, 10);
 
     if (planEnd !== 0 && planStart > planEnd) {
       throw new ERR_TAP_VALIDATION_ERROR(
         `plan start ${planStart} is greater than plan end ${planEnd}`
-      )
+      );
     }
   }
 
@@ -74,52 +74,52 @@ class TAPValidationStrategy {
   // validate test points grouped by their "nesting" level. This is because a set of
   // Test points belongs to a TAP document. Each new subtest block creates a new TAP document.
   // https://testanything.org/tap-version-14-specification.html#subtests
-  #validateTestPoints (ast) {
+  #validateTestPoints(ast) {
     const bailoutEntry = ArrayPrototypeFind(
       ast,
       (node) => node.kind === TokenKind.TAP_BAIL_OUT
-    )
+    );
     const planEntry = ArrayPrototypeFind(
       ast,
       (node) => node.kind === TokenKind.TAP_PLAN
-    )
+    );
     const testPointEntries = ArrayPrototypeFilter(
       ast,
       (node) => node.kind === TokenKind.TAP_TEST_POINT
-    )
+    );
 
-    const plan = planEntry.node
+    const plan = planEntry.node;
 
-    const planStart = NumberParseInt(plan.start, 10)
-    const planEnd = NumberParseInt(plan.end, 10)
+    const planStart = NumberParseInt(plan.start, 10);
+    const planEnd = NumberParseInt(plan.end, 10);
 
     if (planEnd === 0 && testPointEntries.length > 0) {
       throw new ERR_TAP_VALIDATION_ERROR(
         `found ${testPointEntries.length} Test Point${
-          testPointEntries.length > 1 ? 's' : ''
+          testPointEntries.length > 1 ? "s" : ""
         } but plan is ${planStart}..0`
-      )
+      );
     }
 
     if (planEnd > 0) {
       if (testPointEntries.length === 0) {
-        throw new ERR_TAP_VALIDATION_ERROR('missing Test Points')
+        throw new ERR_TAP_VALIDATION_ERROR("missing Test Points");
       }
 
       if (!bailoutEntry && testPointEntries.length !== planEnd) {
         throw new ERR_TAP_VALIDATION_ERROR(
           `test Points count ${testPointEntries.length} does not match plan count ${planEnd}`
-        )
+        );
       }
 
       for (let i = 0; i < testPointEntries.length; i++) {
-        const test = testPointEntries[i].node
-        const testId = NumberParseInt(test.id, 10)
+        const test = testPointEntries[i].node;
+        const testId = NumberParseInt(test.id, 10);
 
         if (testId < planStart || testId > planEnd) {
           throw new ERR_TAP_VALIDATION_ERROR(
             `test ${testId} is out of plan range ${planStart}..${planEnd}`
-          )
+          );
         }
       }
     }
@@ -131,26 +131,26 @@ class TAP13ValidationStrategy extends TAPValidationStrategy {}
 class TAP14ValidationStrategy extends TAPValidationStrategy {}
 
 class TapChecker {
-  static TAP13 = '13'
-  static TAP14 = '14'
+  static TAP13 = "13";
+  static TAP14 = "14";
 
-  constructor ({ specs }) {
+  constructor({ specs }) {
     switch (specs) {
       case TapChecker.TAP13:
-        this.strategy = new TAP13ValidationStrategy()
-        break
+        this.strategy = new TAP13ValidationStrategy();
+        break;
       default:
-        this.strategy = new TAP14ValidationStrategy()
+        this.strategy = new TAP14ValidationStrategy();
     }
   }
 
-  check (ast) {
-    return this.strategy.validate(ast)
+  check(ast) {
+    return this.strategy.validate(ast);
   }
 }
 
 module.exports = {
   TapChecker,
   TAP14ValidationStrategy,
-  TAP13ValidationStrategy
-}
+  TAP13ValidationStrategy,
+};

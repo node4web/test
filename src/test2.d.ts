@@ -1,5 +1,3 @@
-
-
 type TestFn = (t: TestContext) => any | Promise<any>;
 
 export default test;

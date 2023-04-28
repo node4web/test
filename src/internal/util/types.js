@@ -1,3 +1,3 @@
-const { types } = require('util')
+const { types } = require("util");
 
-module.exports = types
+module.exports = types;

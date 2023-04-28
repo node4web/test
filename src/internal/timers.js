@@ -1,7 +1,7 @@
-'use strict'
+"use strict";
 
-const TIMEOUT_MAX = 2 ** 31 - 1
+const TIMEOUT_MAX = 2 ** 31 - 1;
 
 module.exports = {
-  TIMEOUT_MAX
-}
+  TIMEOUT_MAX,
+};

@@ -1,5 +1,5 @@
 // https://github.com/nodejs/node/blob/4c08c20e575a0954fe3977a20e9f52b4980a2e48/lib/internal/test_runner/tap_parser.js
-'use strict'
+"use strict";
 
 const {
   ArrayPrototypeFilter,
@@ -17,15 +17,15 @@ const {
   StringPrototypeReplaceAll,
   StringPrototypeSlice,
   StringPrototypeSplit,
-  StringPrototypeTrim
-} = require('#internal/per_context/primordials')
-const Transform = require('stream').Transform
-const { TapLexer, TokenKind } = require('#internal/test_runner/tap_lexer')
-const { TapChecker } = require('#internal/test_runner/tap_checker')
+  StringPrototypeTrim,
+} = require("#internal/per_context/primordials");
+const Transform = require("stream").Transform;
+const { TapLexer, TokenKind } = require("#internal/test_runner/tap_lexer");
+const { TapChecker } = require("#internal/test_runner/tap_checker");
 const {
-  codes: { ERR_TAP_VALIDATION_ERROR, ERR_TAP_PARSER_ERROR }
-} = require('#internal/errors')
-const { kEmptyObject } = require('#internal/util')
+  codes: { ERR_TAP_VALIDATION_ERROR, ERR_TAP_PARSER_ERROR },
+} = require("#internal/errors");
+const { kEmptyObject } = require("#internal/util");
 /**
  *
  * TAP14 specifications
@@ -58,203 +58,195 @@ const { kEmptyObject } = require('#internal/util')
  * An LL(1) parser for TAP14/TAP13.
  */
 class TapParser extends Transform {
-  #checker = null
-  #lexer = null
-  #currentToken = null
+  #checker = null;
+  #lexer = null;
+  #currentToken = null;
 
-  #input = ''
-  #currentChunkAsString = ''
-  #lastLine = ''
+  #input = "";
+  #currentChunkAsString = "";
+  #lastLine = "";
 
-  #tokens = [[]]
-  #flatAST = []
-  #bufferedComments = []
-  #bufferedTestPoints = []
-  #lastTestPointDetails = {}
-  #yamlBlockBuffer = []
+  #tokens = [[]];
+  #flatAST = [];
+  #bufferedComments = [];
+  #bufferedTestPoints = [];
+  #lastTestPointDetails = {};
+  #yamlBlockBuffer = [];
 
-  #currentTokenIndex = 0
-  #currentTokenChunk = 0
-  #subTestNestingLevel = 0
-  #yamlCurrentIndentationLevel = 0
-  #kSubtestBlockIndentationFactor = 4
+  #currentTokenIndex = 0;
+  #currentTokenChunk = 0;
+  #subTestNestingLevel = 0;
+  #yamlCurrentIndentationLevel = 0;
+  #kSubtestBlockIndentationFactor = 4;
 
-  #isYAMLBlock = false
-  #isSyncParsingEnabled = false
+  #isYAMLBlock = false;
+  #isSyncParsingEnabled = false;
 
-  constructor ({ specs = TapChecker.TAP13 } = kEmptyObject) {
-    super({ __proto__: null, readableObjectMode: true })
+  constructor({ specs = TapChecker.TAP13 } = kEmptyObject) {
+    super({ __proto__: null, readableObjectMode: true });
 
-    this.#checker = new TapChecker({ specs })
+    this.#checker = new TapChecker({ specs });
   }
 
   // ----------------------------------------------------------------------//
   // ----------------------------- Public API -----------------------------//
   // ----------------------------------------------------------------------//
 
-  parse (chunkAsString = '', callback = null) {
-    this.#isSyncParsingEnabled = false
-    this.#currentTokenChunk = 0
-    this.#currentTokenIndex = 0
+  parse(chunkAsString = "", callback = null) {
+    this.#isSyncParsingEnabled = false;
+    this.#currentTokenChunk = 0;
+    this.#currentTokenIndex = 0;
     // Note: we are overwriting the input on each stream call
     // This is fine because we don't want to parse previous chunks
-    this.#input = chunkAsString
-    this.#lexer = new TapLexer(chunkAsString)
+    this.#input = chunkAsString;
+    this.#lexer = new TapLexer(chunkAsString);
 
     try {
-      this.#tokens = this.#scanTokens()
-      this.#parseTokens(callback)
+      this.#tokens = this.#scanTokens();
+      this.#parseTokens(callback);
     } catch (error) {
-      callback(null, error)
+      callback(null, error);
     }
   }
 
-  parseSync (input = '', callback = null) {
-    if (typeof input !== 'string' || input === '') {
-      return []
+  parseSync(input = "", callback = null) {
+    if (typeof input !== "string" || input === "") {
+      return [];
     }
 
-    this.#isSyncParsingEnabled = true
-    this.#input = input
-    this.#lexer = new TapLexer(input)
-    this.#tokens = this.#scanTokens()
+    this.#isSyncParsingEnabled = true;
+    this.#input = input;
+    this.#lexer = new TapLexer(input);
+    this.#tokens = this.#scanTokens();
 
-    this.#parseTokens(callback)
+    this.#parseTokens(callback);
 
     if (this.#isYAMLBlock) {
       // Looks like we have a non-ending YAML block
-      this.#error('Expected end of YAML block')
+      this.#error("Expected end of YAML block");
     }
 
     // Manually flush the remaining buffered comments and test points
-    this._flush()
+    this._flush();
 
-    return this.#flatAST
+    return this.#flatAST;
   }
 
   // Check if the TAP content is semantically valid
   // Note: Validating the TAP content requires the whole AST to be available.
-  check () {
+  check() {
     if (this.#isSyncParsingEnabled) {
-      return this.#checker.check(this.#flatAST)
+      return this.#checker.check(this.#flatAST);
     }
 
     // TODO(@manekinekko): when running in async mode, it doesn't make sense to
     // validate the current chunk. Validation needs to whole AST to be available.
     throw new ERR_TAP_VALIDATION_ERROR(
-      'TAP validation is not supported for async parsing'
-    )
+      "TAP validation is not supported for async parsing"
+    );
   }
   // ----------------------------------------------------------------------//
   // --------------------------- Transform API ----------------------------//
   // ----------------------------------------------------------------------//
 
-  processChunk (chunk) {
-    const str = this.#lastLine + chunk.toString('utf8')
-    const lines = StringPrototypeSplit(str, '\n')
-    this.#lastLine = ArrayPrototypePop(lines)
+  processChunk(chunk) {
+    const str = this.#lastLine + chunk.toString("utf8");
+    const lines = StringPrototypeSplit(str, "\n");
+    this.#lastLine = ArrayPrototypePop(lines);
 
-    let chunkAsString = ArrayPrototypeJoin(lines, '\n')
+    let chunkAsString = ArrayPrototypeJoin(lines, "\n");
     // Special case where chunk is emitted by a child process
-    chunkAsString = StringPrototypeReplaceAll(
-      chunkAsString,
-      '[out] ',
-      ''
-    )
-    chunkAsString = StringPrototypeReplaceAll(
-      chunkAsString,
-      '[err] ',
-      ''
-    )
-    if (StringPrototypeEndsWith(chunkAsString, '\n')) {
-      chunkAsString = StringPrototypeSlice(chunkAsString, 0, -1)
+    chunkAsString = StringPrototypeReplaceAll(chunkAsString, "[out] ", "");
+    chunkAsString = StringPrototypeReplaceAll(chunkAsString, "[err] ", "");
+    if (StringPrototypeEndsWith(chunkAsString, "\n")) {
+      chunkAsString = StringPrototypeSlice(chunkAsString, 0, -1);
     }
-    if (StringPrototypeEndsWith(chunkAsString, 'EOF')) {
-      chunkAsString = StringPrototypeSlice(chunkAsString, 0, -3)
+    if (StringPrototypeEndsWith(chunkAsString, "EOF")) {
+      chunkAsString = StringPrototypeSlice(chunkAsString, 0, -3);
     }
 
-    return chunkAsString
+    return chunkAsString;
   }
 
-  _transform (chunk, _encoding, next) {
-    const chunkAsString = this.processChunk(chunk)
+  _transform(chunk, _encoding, next) {
+    const chunkAsString = this.processChunk(chunk);
 
     if (!chunkAsString) {
       // Ignore empty chunks
-      next()
-      return
+      next();
+      return;
     }
 
     this.parse(chunkAsString, (node, error) => {
       if (error) {
-        next(error)
-        return
+        next(error);
+        return;
       }
 
       if (node.kind === TokenKind.EOF) {
         // Emit when the current chunk is fully processed and consumed
-        next()
+        next();
       }
-    })
+    });
   }
 
   // Flush the remaining buffered comments and test points
   // This will be called automatically when the stream is closed
   // We also call this method manually when we reach the end of the sync parsing
-  _flush (next = null) {
+  _flush(next = null) {
     if (!this.#lastLine) {
-      this.#__flushPendingTestPointsAndComments()
-      next?.()
-      return
+      this.#__flushPendingTestPointsAndComments();
+      next?.();
+      return;
     }
     // Parse the remaining line
     this.parse(this.#lastLine, (node, error) => {
-      this.#lastLine = ''
+      this.#lastLine = "";
 
       if (error) {
-        next?.(error)
-        return
+        next?.(error);
+        return;
       }
 
       if (node.kind === TokenKind.EOF) {
-        this.#__flushPendingTestPointsAndComments()
-        next?.()
+        this.#__flushPendingTestPointsAndComments();
+        next?.();
       }
-    })
+    });
   }
 
-  #__flushPendingTestPointsAndComments () {
+  #__flushPendingTestPointsAndComments() {
     ArrayPrototypeForEach(this.#bufferedTestPoints, (node) => {
-      this.#emit(node)
-    })
+      this.#emit(node);
+    });
     ArrayPrototypeForEach(this.#bufferedComments, (node) => {
-      this.#emit(node)
-    })
+      this.#emit(node);
+    });
 
     // Clean up
-    this.#bufferedTestPoints = []
-    this.#bufferedComments = []
+    this.#bufferedTestPoints = [];
+    this.#bufferedComments = [];
   }
 
   // ----------------------------------------------------------------------//
   // ----------------------------- Private API ----------------------------//
   // ----------------------------------------------------------------------//
 
-  #scanTokens () {
-    return this.#lexer.scan()
+  #scanTokens() {
+    return this.#lexer.scan();
   }
 
-  #parseTokens (callback = null) {
+  #parseTokens(callback = null) {
     for (let index = 0; index < this.#tokens.length; index++) {
-      const chunk = this.#tokens[index]
-      this.#parseChunk(chunk)
+      const chunk = this.#tokens[index];
+      this.#parseChunk(chunk);
     }
 
-    callback?.({ kind: TokenKind.EOF }) // eslint-disable-line n/no-callback-literal
+    callback?.({ kind: TokenKind.EOF }); // eslint-disable-line n/no-callback-literal
   }
 
-  #parseChunk (chunk) {
-    this.#subTestNestingLevel = this.#getCurrentIndentationLevel(chunk)
+  #parseChunk(chunk) {
+    this.#subTestNestingLevel = this.#getCurrentIndentationLevel(chunk);
     // We compute the current index of the token in the chunk
     // based on the indentation level (number of spaces).
     // We also need to take into account if we are in a YAML block or not.
@@ -264,40 +256,40 @@ class TapParser extends Transform {
     if (this.#isYAMLBlock) {
       this.#currentTokenIndex =
         this.#yamlCurrentIndentationLevel *
-        this.#kSubtestBlockIndentationFactor
+        this.#kSubtestBlockIndentationFactor;
     } else {
       this.#currentTokenIndex =
-        this.#subTestNestingLevel * this.#kSubtestBlockIndentationFactor
-      this.#yamlCurrentIndentationLevel = this.#subTestNestingLevel
+        this.#subTestNestingLevel * this.#kSubtestBlockIndentationFactor;
+      this.#yamlCurrentIndentationLevel = this.#subTestNestingLevel;
     }
 
-    let node
+    let node;
 
     // Parse current chunk
     try {
-      node = this.#TAPDocument(chunk)
+      node = this.#TAPDocument(chunk);
     } catch {
       node = {
         kind: TokenKind.UNKNOWN,
         node: {
-          value: this.#currentChunkAsString
-        }
-      }
+          value: this.#currentChunkAsString,
+        },
+      };
     }
 
     // Emit the parsed node to both the stream and the AST
-    this.#emitOrBufferCurrentNode(node)
+    this.#emitOrBufferCurrentNode(node);
 
     // Move pointers to the next chunk and reset the current token index
-    this.#currentTokenChunk++
-    this.#currentTokenIndex = 0
+    this.#currentTokenChunk++;
+    this.#currentTokenIndex = 0;
   }
 
-  #error (message) {
-    const token = this.#currentToken || { value: '', kind: '' }
+  #error(message) {
+    const token = this.#currentToken || { value: "", kind: "" };
     // Escape NewLine characters
-    if (token.value === '\n') {
-      token.value = '\\n'
+    if (token.value === "\n") {
+      token.value = "\\n";
     }
 
     throw new ERR_TAP_PARSER_ERROR(
@@ -305,44 +297,44 @@ class TapParser extends Transform {
       `, received "${token.value}" (${token.kind})`,
       token,
       this.#input
-    )
+    );
   }
 
-  #peek (shouldSkipBlankTokens = true) {
+  #peek(shouldSkipBlankTokens = true) {
     if (shouldSkipBlankTokens) {
-      this.#skip(TokenKind.WHITESPACE)
+      this.#skip(TokenKind.WHITESPACE);
     }
 
-    return this.#tokens[this.#currentTokenChunk][this.#currentTokenIndex]
+    return this.#tokens[this.#currentTokenChunk][this.#currentTokenIndex];
   }
 
-  #next (shouldSkipBlankTokens = true) {
+  #next(shouldSkipBlankTokens = true) {
     if (shouldSkipBlankTokens) {
-      this.#skip(TokenKind.WHITESPACE)
+      this.#skip(TokenKind.WHITESPACE);
     }
 
     if (this.#tokens[this.#currentTokenChunk]) {
       this.#currentToken =
-        this.#tokens[this.#currentTokenChunk][this.#currentTokenIndex++]
+        this.#tokens[this.#currentTokenChunk][this.#currentTokenIndex++];
     } else {
-      this.#currentToken = null
+      this.#currentToken = null;
     }
 
-    return this.#currentToken
+    return this.#currentToken;
   }
 
   // Skip the provided tokens in the current chunk
-  #skip (...tokensToSkip) {
-    let token = this.#tokens[this.#currentTokenChunk][this.#currentTokenIndex]
+  #skip(...tokensToSkip) {
+    let token = this.#tokens[this.#currentTokenChunk][this.#currentTokenIndex];
     while (token && ArrayPrototypeIncludes(tokensToSkip, token.kind)) {
       // pre-increment to skip current tokens but make sure we don't advance index on the last iteration
-      token = this.#tokens[this.#currentTokenChunk][++this.#currentTokenIndex]
+      token = this.#tokens[this.#currentTokenChunk][++this.#currentTokenIndex];
     }
   }
 
-  #readNextLiterals () {
-    const literals = []
-    let nextToken = this.#peek(false)
+  #readNextLiterals() {
+    const literals = [];
+    let nextToken = this.#peek(false);
 
     // Read all literal, numeric, whitespace and escape tokens until we hit a different token
     // or reach end of current chunk
@@ -355,121 +347,121 @@ class TapParser extends Transform {
           TokenKind.DASH,
           TokenKind.PLUS,
           TokenKind.WHITESPACE,
-          TokenKind.ESCAPE
+          TokenKind.ESCAPE,
         ],
         nextToken.kind
       )
     ) {
-      const word = this.#next(false).value
+      const word = this.#next(false).value;
 
       // Don't output escaped characters
       if (nextToken.kind !== TokenKind.ESCAPE) {
-        ArrayPrototypePush(literals, word)
+        ArrayPrototypePush(literals, word);
       }
 
-      nextToken = this.#peek(false)
+      nextToken = this.#peek(false);
     }
 
-    return ArrayPrototypeJoin(literals, '')
+    return ArrayPrototypeJoin(literals, "");
   }
 
-  #countLeadingSpacesInCurrentChunk (chunk) {
+  #countLeadingSpacesInCurrentChunk(chunk) {
     // Count the number of whitespace tokens in the chunk, starting from the first token
-    let whitespaceCount = 0
+    let whitespaceCount = 0;
     while (chunk?.[whitespaceCount]?.kind === TokenKind.WHITESPACE) {
-      whitespaceCount++
+      whitespaceCount++;
     }
-    return whitespaceCount
+    return whitespaceCount;
   }
 
-  #addDiagnosticsToLastTestPoint (currentNode) {
-    const { length, [length - 1]: lastTestPoint } = this.#bufferedTestPoints
+  #addDiagnosticsToLastTestPoint(currentNode) {
+    const { length, [length - 1]: lastTestPoint } = this.#bufferedTestPoints;
 
     // Diagnostic nodes are only added to Test points of the same nesting level
     if (lastTestPoint && lastTestPoint.nesting === currentNode.nesting) {
-      lastTestPoint.node.time = this.#lastTestPointDetails.duration
+      lastTestPoint.node.time = this.#lastTestPointDetails.duration;
 
       // TODO(@manekinekko): figure out where to put the other diagnostic properties
       // See https://github.com/nodejs/node/pull/44952
-      lastTestPoint.node.diagnostics = lastTestPoint.node.diagnostics || []
+      lastTestPoint.node.diagnostics = lastTestPoint.node.diagnostics || [];
 
       ArrayPrototypeForEach(currentNode.node.diagnostics, (diagnostic) => {
         // Avoid adding empty diagnostics
         if (diagnostic) {
-          ArrayPrototypePush(lastTestPoint.node.diagnostics, diagnostic)
+          ArrayPrototypePush(lastTestPoint.node.diagnostics, diagnostic);
         }
-      })
+      });
 
-      this.#bufferedTestPoints = []
+      this.#bufferedTestPoints = [];
     }
 
-    return lastTestPoint
+    return lastTestPoint;
   }
 
-  #flushBufferedTestPointNode (shouldClearBuffer = true) {
+  #flushBufferedTestPointNode(shouldClearBuffer = true) {
     if (this.#bufferedTestPoints.length > 0) {
-      this.#emit(this.#bufferedTestPoints[0])
+      this.#emit(this.#bufferedTestPoints[0]);
 
       if (shouldClearBuffer) {
-        this.#bufferedTestPoints = []
+        this.#bufferedTestPoints = [];
       }
     }
   }
 
-  #addCommentsToCurrentNode (currentNode) {
+  #addCommentsToCurrentNode(currentNode) {
     if (this.#bufferedComments.length > 0) {
       currentNode.comments = ArrayPrototypeMap(
         this.#bufferedComments,
         (c) => c.node.comment
-      )
-      this.#bufferedComments = []
+      );
+      this.#bufferedComments = [];
     }
 
-    return currentNode
+    return currentNode;
   }
 
-  #flushBufferedComments (shouldClearBuffer = true) {
+  #flushBufferedComments(shouldClearBuffer = true) {
     if (this.#bufferedComments.length > 0) {
       ArrayPrototypeForEach(this.#bufferedComments, (node) => {
-        this.#emit(node)
-      })
+        this.#emit(node);
+      });
 
       if (shouldClearBuffer) {
-        this.#bufferedComments = []
+        this.#bufferedComments = [];
       }
     }
   }
 
-  #getCurrentIndentationLevel (chunk) {
-    const whitespaceCount = this.#countLeadingSpacesInCurrentChunk(chunk)
-    return (whitespaceCount / this.#kSubtestBlockIndentationFactor) | 0
+  #getCurrentIndentationLevel(chunk) {
+    const whitespaceCount = this.#countLeadingSpacesInCurrentChunk(chunk);
+    return (whitespaceCount / this.#kSubtestBlockIndentationFactor) | 0;
   }
 
-  #emit (node) {
+  #emit(node) {
     if (node.kind !== TokenKind.EOF) {
-      ArrayPrototypePush(this.#flatAST, node)
+      ArrayPrototypePush(this.#flatAST, node);
       this.push({
         __proto__: null,
-        ...node
-      })
+        ...node,
+      });
     }
   }
 
-  #emitOrBufferCurrentNode (currentNode) {
+  #emitOrBufferCurrentNode(currentNode) {
     currentNode = {
       ...currentNode,
       nesting: this.#subTestNestingLevel,
-      lexeme: this.#currentChunkAsString
-    }
+      lexeme: this.#currentChunkAsString,
+    };
 
     switch (currentNode.kind) {
       // Emit these nodes
       case TokenKind.UNKNOWN:
         if (!currentNode.node.value) {
           // Ignore unrecognized and empty nodes
-          break
+          break;
         }
-        // falls through
+      // falls through
 
       case TokenKind.TAP_PLAN:
       case TokenKind.TAP_PRAGMA:
@@ -477,14 +469,14 @@ class TapParser extends Transform {
       case TokenKind.TAP_BAIL_OUT:
       case TokenKind.TAP_SUBTEST_POINT:
         // Check if we have a buffered test point, and if so, emit it
-        this.#flushBufferedTestPointNode()
+        this.#flushBufferedTestPointNode();
 
         // If we have buffered comments, add them to the current node
-        currentNode = this.#addCommentsToCurrentNode(currentNode)
+        currentNode = this.#addCommentsToCurrentNode(currentNode);
 
         // Emit the current node
-        this.#emit(currentNode)
-        break
+        this.#emit(currentNode);
+        break;
 
       // By default, we buffer the next test point node in case we have a diagnostic
       // to add to it in the next iteration
@@ -492,37 +484,37 @@ class TapParser extends Transform {
       case TokenKind.TAP_TEST_POINT:
         // In case of an already buffered test point, we flush it and buffer the current one
         // Because diagnostic nodes are only added to the last processed test point
-        this.#flushBufferedTestPointNode()
+        this.#flushBufferedTestPointNode();
 
         // Buffer this node (and also add any pending comments to it)
         ArrayPrototypePush(
           this.#bufferedTestPoints,
           this.#addCommentsToCurrentNode(currentNode)
-        )
-        break
+        );
+        break;
 
       // Keep buffering comments until we hit a non-comment node, then add them to the that node
       // Note: in case we hit and EOF, we flush the comments buffer (see _flush())
       case TokenKind.COMMENT:
-        ArrayPrototypePush(this.#bufferedComments, currentNode)
-        break
+        ArrayPrototypePush(this.#bufferedComments, currentNode);
+        break;
 
       // Diagnostic nodes are added to Test points of the same nesting level
       case TokenKind.TAP_YAML_END:
         // Emit either the last updated test point (w/ diagnostics) or the current diagnostics node alone
         this.#emit(
           this.#addDiagnosticsToLastTestPoint(currentNode) || currentNode
-        )
-        break
+        );
+        break;
 
       // In case we hit an EOF, we emit it to indicate the end of the stream
       case TokenKind.EOF:
-        this.#emit(currentNode)
-        break
+        this.#emit(currentNode);
+        break;
     }
   }
 
-  #serializeChunk (chunk) {
+  #serializeChunk(chunk) {
     return ArrayPrototypeJoin(
       ArrayPrototypeMap(
         // Exclude NewLine and EOF tokens
@@ -533,8 +525,8 @@ class TapParser extends Transform {
         ),
         (token) => token.value
       ),
-      ''
-    )
+      ""
+    );
   }
 
   // --------------------------------------------------------------------------//
@@ -542,138 +534,138 @@ class TapParser extends Transform {
   // --------------------------------------------------------------------------//
 
   // TAPDocument := Version Plan Body | Version Body Plan
-  #TAPDocument (tokenChunks) {
-    this.#currentChunkAsString = this.#serializeChunk(tokenChunks)
-    const firstToken = this.#peek(false)
+  #TAPDocument(tokenChunks) {
+    this.#currentChunkAsString = this.#serializeChunk(tokenChunks);
+    const firstToken = this.#peek(false);
 
     if (firstToken) {
-      const { kind } = firstToken
+      const { kind } = firstToken;
 
       switch (kind) {
         case TokenKind.TAP:
-          return this.#Version()
+          return this.#Version();
         case TokenKind.NUMERIC:
-          return this.#Plan()
+          return this.#Plan();
         case TokenKind.TAP_TEST_OK:
         case TokenKind.TAP_TEST_NOTOK:
-          return this.#TestPoint()
+          return this.#TestPoint();
         case TokenKind.COMMENT:
         case TokenKind.HASH:
-          return this.#Comment()
+          return this.#Comment();
         case TokenKind.TAP_PRAGMA:
-          return this.#Pragma()
+          return this.#Pragma();
         case TokenKind.WHITESPACE:
-          return this.#YAMLBlock()
+          return this.#YAMLBlock();
         case TokenKind.LITERAL:
           // Check for "Bail out!" literal (case insensitive)
           if (
             RegExpPrototypeExec(/^Bail\s+out!/i, this.#currentChunkAsString)
           ) {
-            return this.#Bailout()
+            return this.#Bailout();
           } else if (this.#isYAMLBlock) {
-            return this.#YAMLBlock()
+            return this.#YAMLBlock();
           }
 
           // Read token because error needs the last token details
-          this.#next(false)
-          this.#error('Expected a valid token')
+          this.#next(false);
+          this.#error("Expected a valid token");
 
-          break
+          break;
         case TokenKind.EOF:
-          return firstToken
+          return firstToken;
 
         case TokenKind.NEWLINE:
           // Consume and ignore NewLine token
-          return this.#next(false)
+          return this.#next(false);
         default:
           // Read token because error needs the last token details
-          this.#next(false)
-          this.#error('Expected a valid token')
+          this.#next(false);
+          this.#error("Expected a valid token");
       }
     }
 
     const node = {
       kind: TokenKind.UNKNOWN,
       node: {
-        value: this.#currentChunkAsString
-      }
-    }
+        value: this.#currentChunkAsString,
+      },
+    };
 
     // We make sure the emitted node has the same shape
     // both in sync and async parsing (for the stream interface)
-    return node
+    return node;
   }
 
   // ----------------Version----------------
   // Version := "TAP version Number\n"
-  #Version () {
-    const tapToken = this.#peek()
+  #Version() {
+    const tapToken = this.#peek();
 
     if (tapToken.kind === TokenKind.TAP) {
-      this.#next() // Consume the TAP token
+      this.#next(); // Consume the TAP token
     } else {
-      this.#error('Expected "TAP" keyword')
+      this.#error('Expected "TAP" keyword');
     }
 
-    const versionToken = this.#peek()
+    const versionToken = this.#peek();
     if (versionToken?.kind === TokenKind.TAP_VERSION) {
-      this.#next() // Consume the version token
+      this.#next(); // Consume the version token
     } else {
-      this.#error('Expected "version" keyword')
+      this.#error('Expected "version" keyword');
     }
 
-    const numberToken = this.#peek()
+    const numberToken = this.#peek();
     if (numberToken?.kind === TokenKind.NUMERIC) {
-      const version = this.#next().value
-      const node = { kind: TokenKind.TAP_VERSION, node: { version } }
-      return node
+      const version = this.#next().value;
+      const node = { kind: TokenKind.TAP_VERSION, node: { version } };
+      return node;
     }
-    this.#error('Expected a version number')
+    this.#error("Expected a version number");
   }
 
   // ----------------Plan----------------
   // Plan := "1.." (Number) (" # " Reason)? "\n"
-  #Plan () {
+  #Plan() {
     // Even if specs mention plan starts at 1, we need to make sure we read the plan start value
     // in case of a missing or invalid plan start value
-    const planStart = this.#next()
+    const planStart = this.#next();
 
     if (planStart.kind !== TokenKind.NUMERIC) {
-      this.#error('Expected a plan start count')
+      this.#error("Expected a plan start count");
     }
 
-    const planToken = this.#next()
+    const planToken = this.#next();
     if (planToken?.kind !== TokenKind.TAP_PLAN) {
-      this.#error('Expected ".." symbol')
+      this.#error('Expected ".." symbol');
     }
 
-    const planEnd = this.#next()
+    const planEnd = this.#next();
     if (planEnd?.kind !== TokenKind.NUMERIC) {
-      this.#error('Expected a plan end count')
+      this.#error("Expected a plan end count");
     }
 
     const plan = {
       start: planStart.value,
-      end: planEnd.value
-    }
+      end: planEnd.value,
+    };
 
     // Read optional reason
-    const hashToken = this.#peek()
+    const hashToken = this.#peek();
     if (hashToken) {
       if (hashToken.kind === TokenKind.HASH) {
-        this.#next() // skip hash
-        plan.reason = StringPrototypeTrim(this.#readNextLiterals())
+        this.#next(); // skip hash
+        plan.reason = StringPrototypeTrim(this.#readNextLiterals());
       } else if (hashToken.kind === TokenKind.LITERAL) {
-        this.#error('Expected "#" symbol before a reason')
+        this.#error('Expected "#" symbol before a reason');
       }
     }
 
     const node = {
       kind: TokenKind.TAP_PLAN,
-      node: plan
-    }
+      node: plan,
+    };
 
-    return node
+    return node;
   }
 
   // ----------------TestPoint----------------
@@ -686,26 +678,26 @@ class TapParser extends Transform {
   // Test number (recommended)
   // Description (recommended, prefixed by " - ")
   // Directive (only when necessary)
-  #TestPoint () {
-    const notToken = this.#peek()
-    let isTestFailed = false
+  #TestPoint() {
+    const notToken = this.#peek();
+    let isTestFailed = false;
 
     if (notToken.kind === TokenKind.TAP_TEST_NOTOK) {
-      this.#next() // skip "not" token
-      isTestFailed = true
+      this.#next(); // skip "not" token
+      isTestFailed = true;
     }
 
-    const okToken = this.#next()
+    const okToken = this.#next();
     if (okToken.kind !== TokenKind.TAP_TEST_OK) {
-      this.#error('Expected "ok" or "not ok" keyword')
+      this.#error('Expected "ok" or "not ok" keyword');
     }
 
     // Read optional test number
-    let numberToken = this.#peek()
+    let numberToken = this.#peek();
     if (numberToken && numberToken.kind === TokenKind.NUMERIC) {
-      numberToken = this.#next().value
+      numberToken = this.#next().value;
     } else {
-      numberToken = '' // Set an empty ID to indicate that the test hasn't provider an ID
+      numberToken = ""; // Set an empty ID to indicate that the test hasn't provider an ID
     }
 
     const test = {
@@ -714,119 +706,119 @@ class TapParser extends Transform {
         fail: isTestFailed,
         pass: !isTestFailed,
         todo: false,
-        skip: false
+        skip: false,
       },
       id: numberToken,
-      description: '',
-      reason: '',
+      description: "",
+      reason: "",
       time: 0,
-      diagnostics: []
-    }
+      diagnostics: [],
+    };
 
     // Read optional description prefix " - "
-    const descriptionDashToken = this.#peek()
+    const descriptionDashToken = this.#peek();
     if (descriptionDashToken && descriptionDashToken.kind === TokenKind.DASH) {
-      this.#next() // skip dash
+      this.#next(); // skip dash
     }
 
     // Read optional description
     if (this.#peek()) {
-      const description = StringPrototypeTrim(this.#readNextLiterals())
+      const description = StringPrototypeTrim(this.#readNextLiterals());
       if (description) {
-        test.description = description
+        test.description = description;
       }
     }
 
     // Read optional directive and reason
-    const hashToken = this.#peek()
+    const hashToken = this.#peek();
     if (hashToken && hashToken.kind === TokenKind.HASH) {
-      this.#next() // skip hash
+      this.#next(); // skip hash
     }
 
-    let todoOrSkipToken = this.#peek()
+    let todoOrSkipToken = this.#peek();
     if (todoOrSkipToken && todoOrSkipToken.kind === TokenKind.LITERAL) {
       if (RegExpPrototypeExec(/todo/i, todoOrSkipToken.value)) {
-        todoOrSkipToken = 'todo'
-        this.#next() // skip token
+        todoOrSkipToken = "todo";
+        this.#next(); // skip token
       } else if (RegExpPrototypeExec(/skip/i, todoOrSkipToken.value)) {
-        todoOrSkipToken = 'skip'
-        this.#next() // skip token
+        todoOrSkipToken = "skip";
+        this.#next(); // skip token
       }
     }
 
-    const reason = StringPrototypeTrim(this.#readNextLiterals())
+    const reason = StringPrototypeTrim(this.#readNextLiterals());
     if (todoOrSkipToken) {
       if (reason) {
-        test.reason = reason
+        test.reason = reason;
       }
 
-      test.status.todo = todoOrSkipToken === 'todo'
-      test.status.skip = todoOrSkipToken === 'skip'
+      test.status.todo = todoOrSkipToken === "todo";
+      test.status.skip = todoOrSkipToken === "skip";
     }
 
     const node = {
       kind: TokenKind.TAP_TEST_POINT,
-      node: test
-    }
+      node: test,
+    };
 
-    return node
+    return node;
   }
 
   // ----------------Bailout----------------
   // BailOut := "Bail out!" (" " Reason)? "\n"
-  #Bailout () {
-    this.#next() // skip "Bail"
-    this.#next() // skip "out!"
+  #Bailout() {
+    this.#next(); // skip "Bail"
+    this.#next(); // skip "out!"
 
     // Read optional reason
-    const hashToken = this.#peek()
+    const hashToken = this.#peek();
     if (hashToken && hashToken.kind === TokenKind.HASH) {
-      this.#next() // skip hash
+      this.#next(); // skip hash
     }
 
-    const reason = StringPrototypeTrim(this.#readNextLiterals())
+    const reason = StringPrototypeTrim(this.#readNextLiterals());
 
     const node = {
       kind: TokenKind.TAP_BAIL_OUT,
-      node: { bailout: true, reason }
-    }
+      node: { bailout: true, reason },
+    };
 
-    return node
+    return node;
   }
 
   // ----------------Comment----------------
   // Comment := ^ (" ")* "#" [^\n]* "\n"
-  #Comment () {
-    const commentToken = this.#next()
+  #Comment() {
+    const commentToken = this.#next();
     if (
       commentToken.kind !== TokenKind.COMMENT &&
       commentToken.kind !== TokenKind.HASH
     ) {
-      this.#error('Expected "#" symbol')
+      this.#error('Expected "#" symbol');
     }
 
-    const commentContent = this.#peek()
+    const commentContent = this.#peek();
     if (commentContent) {
       if (RegExpPrototypeExec(/^Subtest:/i, commentContent.value) !== null) {
-        this.#next() // skip subtest keyword
-        const name = StringPrototypeTrim(this.#readNextLiterals())
+        this.#next(); // skip subtest keyword
+        const name = StringPrototypeTrim(this.#readNextLiterals());
         const node = {
           kind: TokenKind.TAP_SUBTEST_POINT,
           node: {
-            name
-          }
-        }
+            name,
+          },
+        };
 
-        return node
+        return node;
       }
 
-      const comment = StringPrototypeTrim(this.#readNextLiterals())
+      const comment = StringPrototypeTrim(this.#readNextLiterals());
       const node = {
         kind: TokenKind.COMMENT,
-        node: { comment }
-      }
+        node: { comment },
+      };
 
-      return node
+      return node;
     }
 
     // If there is no comment content, then we ignore the current node
@@ -834,116 +826,116 @@ class TapParser extends Transform {
 
   // ----------------YAMLBlock----------------
   // YAMLBlock := "  ---\n" (YAMLLine)* "  ...\n"
-  #YAMLBlock () {
-    const space1 = this.#peek(false)
+  #YAMLBlock() {
+    const space1 = this.#peek(false);
     if (space1 && space1.kind === TokenKind.WHITESPACE) {
-      this.#next(false) // skip 1st space
+      this.#next(false); // skip 1st space
     }
 
-    const space2 = this.#peek(false)
+    const space2 = this.#peek(false);
     if (space2 && space2.kind === TokenKind.WHITESPACE) {
-      this.#next(false) // skip 2nd space
+      this.#next(false); // skip 2nd space
     }
 
-    const yamlBlockSymbol = this.#peek(false)
+    const yamlBlockSymbol = this.#peek(false);
 
     if (yamlBlockSymbol.kind === TokenKind.WHITESPACE) {
       if (this.#isYAMLBlock === false) {
-        this.#next(false) // skip 3rd space
-        this.#error('Expected valid YAML indentation (2 spaces)')
+        this.#next(false); // skip 3rd space
+        this.#error("Expected valid YAML indentation (2 spaces)");
       }
     }
 
     if (yamlBlockSymbol.kind === TokenKind.TAP_YAML_START) {
       if (this.#isYAMLBlock) {
         // Looks like we have another YAML start block, but we didn't close the previous one
-        this.#error('Unexpected YAML start marker')
+        this.#error("Unexpected YAML start marker");
       }
 
-      this.#isYAMLBlock = true
-      this.#yamlCurrentIndentationLevel = this.#subTestNestingLevel
-      this.#lastTestPointDetails = {}
+      this.#isYAMLBlock = true;
+      this.#yamlCurrentIndentationLevel = this.#subTestNestingLevel;
+      this.#lastTestPointDetails = {};
 
       // Consume the YAML start marker
-      this.#next(false) // skip "---"
+      this.#next(false); // skip "---"
 
       // No need to pass this token to the stream interface
-      return
+      return;
     } else if (yamlBlockSymbol.kind === TokenKind.TAP_YAML_END) {
-      this.#next(false) // skip "..."
+      this.#next(false); // skip "..."
 
       if (!this.#isYAMLBlock) {
         // Looks like we have an YAML end block, but we didn't encounter any YAML start marker
-        this.#error('Unexpected YAML end marker')
+        this.#error("Unexpected YAML end marker");
       }
 
-      this.#isYAMLBlock = false
+      this.#isYAMLBlock = false;
 
-      const diagnostics = this.#yamlBlockBuffer
-      this.#yamlBlockBuffer = [] // Free the buffer for the next YAML block
+      const diagnostics = this.#yamlBlockBuffer;
+      this.#yamlBlockBuffer = []; // Free the buffer for the next YAML block
 
       const node = {
         kind: TokenKind.TAP_YAML_END,
         node: {
-          diagnostics
-        }
-      }
+          diagnostics,
+        },
+      };
 
-      return node
+      return node;
     }
 
     if (this.#isYAMLBlock) {
-      this.#YAMLLine()
+      this.#YAMLLine();
     } else {
       return {
         kind: TokenKind.UNKNOWN,
         node: {
-          value: yamlBlockSymbol.value
-        }
-      }
+          value: yamlBlockSymbol.value,
+        },
+      };
     }
   }
 
   // ----------------YAMLLine----------------
   // YAMLLine := "  " (YAML)* "\n"
-  #YAMLLine () {
-    const yamlLiteral = this.#readNextLiterals()
-    const { 0: key, 1: value } = StringPrototypeSplit(yamlLiteral, ':', 2)
+  #YAMLLine() {
+    const yamlLiteral = this.#readNextLiterals();
+    const { 0: key, 1: value } = StringPrototypeSplit(yamlLiteral, ":", 2);
 
     // Note that this.#lastTestPointDetails has been cleared when we encounter a YAML start marker
 
     switch (key) {
-      case 'duration_ms':
-        this.#lastTestPointDetails.duration = Number(value)
-        break
+      case "duration_ms":
+        this.#lastTestPointDetails.duration = Number(value);
+        break;
       // Below are diagnostic properties introduced in https://github.com/nodejs/node/pull/44952
-      case 'expected':
-        this.#lastTestPointDetails.expected = Boolean(value)
-        break
-      case 'actual':
-        this.#lastTestPointDetails.actual = Boolean(value)
-        break
-      case 'operator':
-        this.#lastTestPointDetails.operator = String(value)
-        break
+      case "expected":
+        this.#lastTestPointDetails.expected = Boolean(value);
+        break;
+      case "actual":
+        this.#lastTestPointDetails.actual = Boolean(value);
+        break;
+      case "operator":
+        this.#lastTestPointDetails.operator = String(value);
+        break;
     }
 
-    ArrayPrototypePush(this.#yamlBlockBuffer, yamlLiteral)
+    ArrayPrototypePush(this.#yamlBlockBuffer, yamlLiteral);
   }
 
   // ----------------PRAGMA----------------
   // Pragma := "pragma " [+-] PragmaKey "\n"
   // PragmaKey := ([a-zA-Z0-9_-])+
   // TODO(@manekinekko): pragmas are parsed but not used yet! TapChecker() should take care of that.
-  #Pragma () {
-    const pragmaToken = this.#next()
+  #Pragma() {
+    const pragmaToken = this.#next();
     if (pragmaToken.kind !== TokenKind.TAP_PRAGMA) {
-      this.#error('Expected "pragma" keyword')
+      this.#error('Expected "pragma" keyword');
     }
 
-    const pragmas = {}
+    const pragmas = {};
 
-    let nextToken = this.#peek()
+    let nextToken = this.#peek();
     while (
       nextToken &&
       ArrayPrototypeIncludes(
@@ -951,40 +943,40 @@ class TapParser extends Transform {
         nextToken.kind
       ) === false
     ) {
-      let isEnabled = true
-      const pragmaKeySign = this.#next()
+      let isEnabled = true;
+      const pragmaKeySign = this.#next();
       if (pragmaKeySign.kind === TokenKind.PLUS) {
-        isEnabled = true
+        isEnabled = true;
       } else if (pragmaKeySign.kind === TokenKind.DASH) {
-        isEnabled = false
+        isEnabled = false;
       } else {
-        this.#error('Expected "+" or "-" before pragma keys')
+        this.#error('Expected "+" or "-" before pragma keys');
       }
 
-      const pragmaKeyToken = this.#peek()
+      const pragmaKeyToken = this.#peek();
       if (pragmaKeyToken.kind !== TokenKind.LITERAL) {
-        this.#error('Expected pragma key')
+        this.#error("Expected pragma key");
       }
 
-      let pragmaKey = this.#next().value
+      let pragmaKey = this.#next().value;
 
       // In some cases, pragma key can be followed by a comma separator,
       // so we need to remove it
-      pragmaKey = StringPrototypeReplaceAll(pragmaKey, ',', '')
+      pragmaKey = StringPrototypeReplaceAll(pragmaKey, ",", "");
 
-      pragmas[pragmaKey] = isEnabled
-      nextToken = this.#peek()
+      pragmas[pragmaKey] = isEnabled;
+      nextToken = this.#peek();
     }
 
     const node = {
       kind: TokenKind.TAP_PRAGMA,
       node: {
-        pragmas
-      }
-    }
+        pragmas,
+      },
+    };
 
-    return node
+    return node;
   }
 }
 
-module.exports = { TapParser }
+module.exports = { TapParser };
