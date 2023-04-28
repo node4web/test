@@ -14,5 +14,14 @@
     "pretest": "prettier -w --ignore-path .gitignore .",
     "test": "vite",
     "build-docs": "typedoc"
+  },
+  "devDependencies": {
+    "prettier": "^2.8.8",
+    "prettier-plugin-jsdoc": "^0.4.2",
+    "prettier-plugin-packagejson": "^2.4.3",
+    "typedoc": "^0.24.6",
+    "typescript": "^5.0.4",
+    "vite": "^4.3.3",
+    "vite-plugin-dts": "^2.3.0"
   }
 }

@@ -1,33 +1,4 @@
-interface TestOptions {
-  /**
-   * The number of tests that can be run at the same time. If unspecified, subtests inherit this value from their parent.
-   * Default: 1.
-   */
-  concurrency?: boolean | number;
 
-  /**
-   * If truthy, the test is skipped. If a string is provided, that string is displayed in the test results as the reason for skipping the test.
-   * Default: false.
-   */
-  skip?: boolean | string;
-
-  /**
-   * If truthy, the test marked as TODO. If a string is provided, that string is displayed in the test results as the reason why the test is TODO.
-   * Default: false.
-   */
-  todo?: boolean | string;
-
-  /**
-   * A number of milliseconds the test will fail after. If unspecified, subtests inherit this value from their parent.
-   * Default: Infinity
-   */
-  timeout?: number;
-
-  /**
-   * Allows aborting an in-progress test
-   */
-  signal?: AbortSignal;
-}
 
 type TestFn = (t: TestContext) => any | Promise<any>;
 

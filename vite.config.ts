@@ -4,6 +4,9 @@ import dts from "vite-plugin-dts";
 export default defineConfig(({ command }) => {
   if (command === "serve") {
     return {
+      server: {
+        host: true,
+      },
       build: {
         rollupOptions: {
           input: {
