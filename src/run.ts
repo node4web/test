@@ -15,20 +15,17 @@ export default function run(options: RunOptions = {}): TestStream {
   if (typeof options !== "object") {
     options = {};
   }
-
-  const { setup, concurrency, timeout, signal, files } = options;
+  let { setup, concurrency, timeout, signal, files } = options;
   if (files != null) {
     if (!Array.isArray(files)) {
       throw new TypeError("options.files must be an array");
     }
   }
+  files ??= [];
 
   const root = createTestTree({ concurrency, timeout, signal });
-  const testFiles = files ?? createTestFileList();
-
-  Promise.all(testFiles.map((path) => runTestFile(path, root))).then(() =>
+  Promise.all(files.map((path) => runTestFile(path, root))).then(() =>
     root.postRun()
   );
-
   return root.reporter;
 }
