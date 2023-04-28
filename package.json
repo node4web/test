@@ -2,18 +2,19 @@
   "name": "@jcbhmr/node-test",
   "version": "1.0.0",
   "description": "🧪 Run `node:test` suites in the browser",
-  "license": "MIT",
-  "repository": "github:jcbhmr/node-test",
   "homepage": "https://jcbhmr.github.io/node-test",
+  "repository": "github:jcbhmr/node-test",
+  "license": "MIT",
   "contributors": [
     "Node.js contributors (https://github.com/nodejs/node-core-test)",
     "Jacob Hummer <jcbhmr@outlook.com> (https://jcbhmr.me/)"
   ],
   "scripts": {
+    "build-docs": "typedoc",
     "prepack": "vite build",
+    "start": "vite",
     "pretest": "prettier -w --ignore-path .gitignore .",
-    "test": "vite",
-    "build-docs": "typedoc"
+    "test": "echo 'User must run tests manually'"
   },
   "devDependencies": {
     "prettier": "^2.8.8",
