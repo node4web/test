@@ -12,18 +12,18 @@
 </div>
 
 👨‍🔬 Great for browser compat with existing `node:test` tests \
+🌲 Lets you run tests against an isolated `<iframe>` DOM \
 🏷️ Implements `node:test` as of Node.js v20.0.0 (see below)
 
 ❓ You may be looking for [nodejs/node-core-test] instead. It's `node:test`
-extracted into an npm package, but coupled very closely to Node.js and intended
-for use on older Node.js versions.
+extracted into an npm package for use on older Node.js versions.
 
 ## Installation
 
-You can download this package locally using npm, Yarn, or pnpm. Just make sure
-that you plan on using it **in the browser**! You can use a bundler like [Vite]
-or [webpack] to bundle npm packages into a nice JavaScript bundle for use in a
-`<script>` tag.
+You can download this package locally using npm, [Yarn], [pnpm], or your other
+favorite Node.js package manager. Just make sure that you plan on using it **in
+the browser**! You can use a bundler like [Vite] or [webpack] to bundle npm
+packages into a nice JavaScript bundle for use in a `<script>` tag.
 
 ```sh
 npm install @jcbhmr/node-test
@@ -62,6 +62,12 @@ native implementation to a browser-compatible implementation:
 
 ## Usage
 
+```js
+import { run } from "@jcbhmr/node-test";
+
+const stream = run({ files: ["./app.test.js"] });
+```
+
 Tests created via the `test` module consist of a single function that is
 processed in one of three ways:
 
@@ -75,12 +81,10 @@ processed in one of three ways:
    considered passing. If the test function receives a callback function and
    also returns a `Promise`, the test will fail.
 
-If any tests fail, we will `reportError()`.
-
 The following example illustrates how tests are written using the `test` module:
 
 ```js
-import assert from "node:assert";
+import assert from "assert";
 import test from "@jcbhmr/node-test";
 
 test("synchronous passing test", (t) => {
@@ -108,18 +112,36 @@ hesitate to [open an Issue]! ❤️
 
 ### Differences from Node.js core `node:test`
 
-1. We don't hide internal stack frames. Unless we are running in an engine where
-   `Error.captureStackTrace()` is a function, in which case we do hide our own
-   stack frames.
-2. We don't integrate with the `node --test` CLI flags. Instead, we use TBD.
+1. We can't hide our internal stack frames on non-Chrome browsers.
+2. You must use the `run()` function yourself. There's no `--test` flag in the
+   browser! 😉
+3. Instead of using Node.js' subprocesses to run tests, we use a hidden
+   `<iframe>` to isolate the test environment.
 
 ## Development
 
+![TypeScript](https://img.shields.io/static/v1?style=for-the-badge&message=TypeScript&color=3178C6&logo=TypeScript&logoColor=FFFFFF&label=)
+![Vite](https://img.shields.io/static/v1?style=for-the-badge&message=Vite&color=646CFF&logo=Vite&logoColor=FFFFFF&label=)
+![Vitest](https://img.shields.io/static/v1?style=for-the-badge&message=Vitest&color=6E9F18&logo=Vitest&logoColor=FFFFFF&label=)
+
 This package is written in TypeScript and uses [Vite] to create a JavaScript
 bundle for publication to [npmjs.com]. We use [Vitest] for testing in a headless
-Chrome browser. You can start up the test watcher by running `npm start`.
+Chrome browser. You can start up the test watcher by running `npm start`. Check
+out the [dev wiki] for more info.
 
 <!-- prettier-ignore-start -->
 [`package.json`'s `imports` key]: https://nodejs.org/api/packages.html#imports
 [official Node.js `node:test` docs]: https://nodejs.org/api/test.html#test-runner
+[nodejs/node-core-test]: https://github.com/nodejs/node-core-test#readme
+[open an Issue]: https://github.com/jcbhmr/node-test/issues/new
+[Yarn]: https://yarnpkg.com/
+[pnpm]: https://pnpm.io/
+[Vite]: https://vitejs.dev/
+[Vitest]: https://vitest.dev/
+[webpack]: https://webpack.js.org/
+[ESM>CDN]: https://esm.sh/
+[jsDelivr]: https://www.jsdelivr.com/esm
+[browserify/commonjs-assert]: https://github.com/browserify/commonjs-assert#readme
+[npmjs.com]: https://www.npmjs.com/
+[dev wiki]: https://github.com/jcbhmr/node-test/wiki
 <!-- prettier-ignore-end -->

@@ -12,17 +12,19 @@
   "scripts": {
     "build-docs": "typedoc",
     "prepack": "vite build",
-    "start": "vite",
+    "start": "vitest",
     "pretest": "prettier -w --ignore-path .gitignore .",
-    "test": "echo 'User must run tests manually'"
+    "test": "tsc --noEmit && vitest typecheck && vitest run"
   },
   "devDependencies": {
+    "@types/node": "^18.16.3",
     "prettier": "^2.8.8",
     "prettier-plugin-jsdoc": "^0.4.2",
     "prettier-plugin-packagejson": "^2.4.3",
     "typedoc": "^0.24.6",
     "typescript": "^5.0.4",
     "vite": "^4.3.3",
-    "vite-plugin-dts": "^2.3.0"
+    "vite-plugin-dts": "^2.3.0",
+    "vitest": "^0.30.1"
   }
 }
