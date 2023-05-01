@@ -1,0 +1,17 @@
+{
+  "name": "@jcbhmr/node-test--test-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc && vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@jcbhmr/node-test": "file:../..",
+    "typescript": "^5.0.2",
+    "vite": "^4.3.2",
+    "vite-plugin-url-redirect": "^0.1.0"
+  }
+}
