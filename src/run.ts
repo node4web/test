@@ -1,31 +1,50 @@
-import type TestStream from "./TestStream";
-import createTestTree from "./createTestTree";
-import createTestFileList from "./createTestFileList";
-import runTestFile from "./runTestFile";
+import TestsStream from "./TestsStream";
 
 interface RunOptions {
-  concurrency?: number;
+  concurrency?: number | boolean;
   files?: string[];
-  setup?: (context: TestStream) => any;
+  setup?: (context: TestsStream) => any;
   signal?: AbortSignal;
   timeout?: number;
 }
 
-export default function run(options: RunOptions = {}): TestStream {
-  if (typeof options !== "object") {
-    options = {};
+export default function run(options: RunOptions = {}): TestsStream {
+  let concurrency: number;
+  const { concurrency: concurrencyOption = false } = options;
+  if (typeof concurrencyOption === "number") {
+    concurrency = concurrencyOption;
+  } else if (concurrencyOption === true) {
+    concurrency = navigator.hardwareConcurrency || 1;
+  } else if (concurrencyOption === false) {
+    concurrency = 1;
+  } else {
+    throw new TypeError();
   }
-  let { setup, concurrency, timeout, signal, files } = options;
-  if (files != null) {
-    if (!Array.isArray(files)) {
-      throw new TypeError("options.files must be an array");
-    }
-  }
-  files ??= [];
+  const { files = [], setup, signal, timeout = Infinity } = options;
 
-  const root = createTestTree({ concurrency, timeout, signal });
-  Promise.all(files.map((path) => runTestFile(path, root))).then(() =>
-    root.postRun()
-  );
-  return root.reporter;
+  const testStream = new TestsStream();
+  setup?.(testStream);
+  for (const file of files) {
+    const url = "" + new URL(file, "" + location);
+
+    const iframe = document.createElement("iframe");
+    iframe.srcdoc = `<script type="module" src="${encodeURI(url)}"></script>`;
+    // @ts-ignore
+    iframe.style = "display: none !important;";
+    document.body.append(iframe);
+
+    iframe.contentWindow.addEventListener("message", ({ data }) => {
+      console.debug("message", file, data);
+    });
+    iframe.contentWindow.addEventListener("error", (event) => {
+      console.error("error", file, event);
+    });
+    iframe.contentWindow.addEventListener("unhandledrejection", (event) => {
+      console.error("unhandledrejection", file, event);
+    });
+    iframe.contentWindow.addEventListener("close", (event) => {
+      console.debug("close", file, event);
+      iframe.remove();
+    });
+  }
 }
